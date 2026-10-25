@@ -133,23 +133,39 @@ def build_report(out_path, pas, areas, years, figures, observations, overlaps_df
     legend = "".join(f"<tr><td><span class='sw' style='background:{c.color}'></span>{html.escape(c.label)}</td>"
                      f"<td>{html.escape(c.label_en)}</td><td class='n'>{c.value}</td><td>{c.band}</td></tr>"
                      for c in CLASSES.itertuples())
+    p.append("""<div class='card'><h2 style='margin-top:0'>Giới thiệu</h2>
+<p>Tháng 10/2026, Google DeepMind và Google Research cùng Viện Tài nguyên Thế giới (WRI) và Viện Phân tích Hệ thống Ứng
+dụng Quốc tế (IIASA) công bố bộ dữ liệu Forest Typology (ForTy) - bản đồ toàn cầu độ phân giải 10 m, phân loại mỗi pixel
+thành các loại rừng và sử dụng đất theo định nghĩa của FAO: rừng nguyên sinh, rừng tái sinh tự nhiên, rừng trồng, rừng
+trồng thâm canh, cây công nghiệp và nông lâm kết hợp, và đất khác. Nền tảng của ForTy là dữ liệu embedding của AlphaEarth
+Foundations. Thay vì phân loại trực tiếp trên ảnh vệ tinh của một thời điểm, mỗi pixel 10 m được mô tả bằng một vector đặc
+trưng tóm tắt chuỗi quan sát vệ tinh nhiều nguồn trong cả năm. Vì mang thông tin về động thái theo thời gian, embedding
+giúp mô hình nhận ra những dấu hiệu mà ảnh đơn lẻ khó thể hiện - kiểu bố trí hàng cây, chu kỳ sinh trưởng, nhịp khai thác
+- vốn là cơ sở để tách rừng tự nhiên khỏi rừng trồng. Dữ liệu embedding AlphaEarth được cung cấp theo năm từ 2017, trùng
+với năm đầu của chuỗi ForTy.</p>
+<p>Các bản đồ rừng toàn cầu trước đây chủ yếu cho biết có cây hay không (độ che phủ cây), hoặc như Natural Forests of the
+World 2020, chỉ tách rừng tự nhiên khỏi phần còn lại cho một năm duy nhất. ForTy có ba điểm mới: (i) phân biệt các loại
+rừng theo nguồn gốc và mức độ quản lý ở độ phân giải 10 m trên toàn cầu; (ii) có chuỗi thời gian theo năm 2017-2025, cho
+biết không chỉ nơi mất rừng mà còn loại sử dụng đất thay thế, kể cả những chuyển đổi “ẩn” như rừng tự nhiên bị thay bằng
+rừng trồng - khu vực vẫn xanh trên ảnh nên bản đồ độ che phủ thường bỏ sót; (iii) cung cấp xác suất cho từng lớp thay vì
+nhãn cứng, cho phép người dùng điều chỉnh ngưỡng theo mục đích sử dụng. Bản đồ năm 2020 được xây dựng làm mốc tham chiếu
+cho Quy định chống phá rừng của EU (EUDR).</p>
+<p>Bài này sử dụng chuỗi ForTy V2 Beta và ranh giới khu bảo tồn từ Cơ sở dữ liệu Khu bảo tồn Thế giới (WDPA) để đánh giá
+biến động loại rừng trong 156 khu bảo tồn của Việt Nam giai đoạn 2017-2025. Với mỗi khu, bài trình bày diện tích từng loại
+rừng theo năm, bản đồ và các chuyển đổi lớp chính giữa 2017 và 2025, nhằm nhận diện nơi rừng tự nhiên được duy trì, nơi
+rừng chuyển sang rừng trồng, cây công nghiệp hoặc đất khác, và nơi rừng phục hồi. Kết quả mang tính sàng lọc, cần được đối
+chiếu với kiểm tra thực địa và số liệu theo dõi diễn biến rừng của địa phương.</p>
+</div>""")
     p.append(f"""<div class='card'><h2 style='margin-top:0'>Dữ liệu và phương pháp</h2>
 <h3>Dữ liệu</h3>
-<p><b>Bộ dữ liệu Forest Typology (ForTy).</b> Dữ liệu chính của phân tích là bộ Forest Typology (ForTy) do Google DeepMind
-và Google Research phát triển cùng Viện Tài nguyên Thế giới (WRI) và Viện Phân tích Hệ thống Ứng dụng Quốc tế (IIASA),
-công bố tháng 10/2026. ForTy phân loại từng pixel 10 m theo định nghĩa của FAO thành: rừng nguyên sinh trưởng thành; rừng
-nguyên sinh đang phục hồi; rừng tái sinh tự nhiên; rừng trồng quản lý theo chu kỳ dài (planted forest); rừng trồng thâm
-canh, sinh trưởng nhanh, thường thuần loài (plantation forest); cây công nghiệp lâu năm và nông lâm kết hợp (cao su, cà
-phê, ca cao, cây ăn quả...); và đất khác. Mô hình học sâu sử dụng đầu vào chính là embedding AlphaEarth Foundations – dạng
-tóm tắt nhiều năm quan sát vệ tinh cho mỗi pixel 10 m – nhờ đó nhận diện được các dấu hiệu như kiểu bố trí trồng, chu kỳ
-sinh trưởng và nhịp khai thác; tập mẫu huấn luyện gồm khoảng 1,7 triệu điểm. Bản đồ năm 2020 được kiểm định tại hơn 9.000
-điểm chọn ngẫu nhiên trên toàn cầu, đạt độ chính xác 90% về loại rừng và 95% về phân biệt rừng/không rừng. Chuỗi thời
-gian {y0}–{y1} dùng trong phân tích này là bản phát hành sớm, áp dụng cách tiếp cận tương tự cho từng năm; độ chính xác
-nêu trên thuộc về bản 2020, chưa có đánh giá riêng cho chuỗi thời gian cũng như cho Việt Nam, nên kết quả thay đổi lớp cần
-được hiểu là ước tính. Sản phẩm cung cấp xác suất cho từng lớp thay vì nhãn cứng; phân tích này chọn lớp có xác suất cao
-nhất, không áp ngưỡng tin cậy.</p>
-<p><b>Dữ liệu trên Google Earth Engine.</b> <code>projects/nature-trace/assets/forest_typology/v2_beta/&lt;năm&gt;</code>
-(ForTy V2 Beta), mỗi năm một bộ ảnh 10 m gồm 7 band xác suất (0–250), tương ứng 7 lớp trong bảng dưới.</p>
+<p><b>Bộ dữ liệu ForTy.</b> Phân tích sử dụng chuỗi ForTy V2 Beta 2017-2025 trên Google Earth Engine
+(<code>projects/nature-trace/assets/forest_typology/v2_beta/&lt;năm&gt;</code>), mỗi năm một ảnh 10 m gồm 7 band xác suất
+(0-250), tương ứng 7 lớp trong bảng dưới. So với 6 lớp của bản 2020, V2 Beta tách rừng nguyên sinh thành hai lớp: trưởng
+thành và đang phục hồi. Mô hình được huấn luyện trên khoảng 1,7 triệu điểm mẫu. Bản đồ năm 2020 được kiểm định tại hơn
+9.000 điểm chọn ngẫu nhiên trên toàn cầu, đạt độ chính xác 90% về loại rừng và 95% về phân biệt rừng/không rừng. Chuỗi
+thời gian là bản phát hành sớm; độ chính xác nêu trên thuộc về bản 2020, chưa có đánh giá riêng cho chuỗi thời gian cũng
+như cho Việt Nam, nên kết quả thay đổi lớp cần được hiểu là ước tính. Phân tích chọn lớp có xác suất cao nhất cho mỗi
+pixel, không áp ngưỡng tin cậy.</p>
 <p><b>Khu bảo tồn.</b> <code>WCMC/WDPA/current/polygons</code>, ISO3 = VNM, trạng thái Designated/Inscribed, không gồm khu
 thuần biển và khu nhỏ hơn 1 km². Các khu quốc gia và quốc tế (UNESCO-MAB, Ramsar, Di sản) đều được tính riêng nên một
 vùng rừng có thể thuộc nhiều khu (xem mục Chồng lấn).</p>
