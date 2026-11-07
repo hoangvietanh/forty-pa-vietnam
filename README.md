@@ -4,6 +4,7 @@ Notebook `notebooks/forty_pa_timeseries.ipynb` lấy các khu bảo tồn của 
 
 - vẽ bản đồ loại rừng năm 2017 và 2025 (ảnh tĩnh), kèm bản đồ thay đổi 2017 → 2025 tính ở 10 m;
 - tính diện tích từng loại rừng cho mỗi năm 2017–2025 và vẽ biểu đồ đường (line chart): diện tích (ha) và thay đổi so với 2017 (ha);
+- tính chỉ số tình trạng rừng (FCI) và ΔFCI 2017 → 2025, kèm kết luận suy giảm / phục hồi / ổn định;
 - nhờ Gemini viết đoạn nhận xét ngắn về biến động.
 
 Kết quả hiển thị trong notebook (10 khu đầu tiên) và được xuất ra báo cáo HTML đầy đủ `outputs/bao_cao_ForTy_PA_VN.html`.
@@ -43,6 +44,10 @@ Kết quả hiển thị trong notebook (10 khu đầu tiên) và được xuấ
 
   Diện tích từng cặp "lớp cũ → lớp mới" tính ở 10 m (`outputs/chuyen_doi_lop_2017_2025.csv`). Ảnh cũng tính từ 10 m rồi gộp dần theo bậc 4×4 xuống cỡ điểm ảnh của hình: màu là loại thay đổi chiếm ưu thế, độ đậm là tỷ lệ pixel 10 m đổi lớp. Ảnh được tải theo từng ô bằng `ee.data.computePixels`, vì một request cho cả khu lớn ở 10 m vượt giới hạn bộ nhớ của GEE.
   - "Đổi lớp" là thay đổi gộp (cả hai chiều), thường lớn hơn nhiều so với thay đổi ròng trên biểu đồ đường. Ví dụ ở Tây Nghệ An: khoảng 6% diện tích đổi lớp, nhưng thay đổi ròng chỉ khoảng 1%. Phần lớn là vùng dao động qua lại giữa rừng và đất khác.
+- **Chỉ số tình trạng rừng (FCI):** mỗi lớp có trọng số theo mức độ tự nhiên (`index.WEIGHTS`: nguyên sinh trưởng thành 1,0; nguyên sinh đang phục hồi 0,8; tái sinh tự nhiên 0,6; rừng trồng 0,3; rừng trồng thâm canh 0,2; cây công nghiệp 0,1; đất khác 0).
+  - FCI của một năm = 100 × Σ (trọng số × diện tích lớp) / diện tích khu. ΔFCI = FCI 2025 − FCI 2017.
+  - FCI được tính cho cả 9 năm, kèm xu hướng Theil–Sen và kiểm định Mann–Kendall. Khu được kết luận suy giảm hoặc phục hồi khi |ΔFCI| ≥ 1 điểm và p < 0,05; còn lại là "ổn định / không rõ".
+  - Trọng số là giả định, nên chiều thay đổi và thứ hạng giữa các khu đáng tin hơn giá trị tuyệt đối.
 - **Nhận xét AI:**
   - Model: mặc định `"auto"`, tức model `gemini-X.Y-flash` cao nhất mà key dùng được (lúc viết là `gemini-3.8-flash`).
   - Gemini chỉ nhận bảng số liệu đã tính và được yêu cầu không dùng thông tin ngoài bảng.
@@ -76,5 +81,6 @@ Mở notebook, chọn kernel `.venv`, rồi chạy tất cả các ô. Để ch�
 | `dien_tich_loai_rung_dai.csv` | Như trên, dạng dài |
 | `chong_lan.csv` | Các cặp khu giao nhau |
 | `chuyen_doi_lop_2017_2025.csv` | Diện tích (ha) từng cặp lớp 2017 → 2025 của mỗi khu, kèm loại thay đổi |
+| `chi_so_FCI.csv` | FCI từng năm, ΔFCI 2017 → 2025, xu hướng, p Mann–Kendall và kết luận của mỗi khu |
 | `nhan_xet_AI.csv` | Nhận xét Gemini của từng khu |
 | `maps/`, `charts/` | Bản đồ 2017/2025, bản đồ thay đổi và biểu đồ của từng khu (PNG) |

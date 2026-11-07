@@ -6,11 +6,13 @@ import html
 import io
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from PIL import Image
 
 from .charts import area_table, fmt_ha
 from .gee import CHANGES, CLASSES, FOREST, NATURAL
+from .index import DECLINE, MAX_P, MIN_DELTA, RECOVERY, WEIGHTS
 
 CSS = """
 :root{--bg:#fcfcfb;--card:#ffffff;--ink:#1f1f1f;--muted:#6b6b6b;--line:#e6e6e3;--accent:#16733a;--warn:#8a5a00}
@@ -35,6 +37,9 @@ img{max-width:100%;height:auto;display:block;margin:8px 0}
 details summary{cursor:pointer;color:var(--muted);font-size:13px;margin-top:6px}
 a{color:var(--accent)}
 .up{color:#1b6e3a}.down{color:#b0303a}
+.fci{background:#f6f6f4;border-radius:6px;padding:8px 12px;margin:10px 0;font-size:14px}
+.badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:13px;font-weight:600;background:#e6e6e3}
+.badge.down{background:#f6e3e5}.badge.up{background:#e1f0e6}
 """
 
 
@@ -115,10 +120,52 @@ def _transitions_html(t, years, top=8):
             f"<th class='n'>% diện tích</th></tr>{rows}</table></div></details>")
 
 
+def _fci_html(r, years):
+    """FCI of the first and last year, the change, the 9-year trend and the verdict of one PA."""
+    y0, y1 = years[0], years[-1]
+    cls = "down" if r.verdict == DECLINE else "up" if r.verdict == RECOVERY else ""
+    sign = lambda v: ("+" if v > 0 else "") + fmt_ha(v, 2)
+    return (f"<div class='fci'><b>Chỉ số FCI</b> {y0}: {fmt_ha(r[f'fci_{y0}'], 1)} → {y1}: {fmt_ha(r[f'fci_{y1}'], 1)}"
+            f" · <b>ΔFCI = <span class='{cls}'>{sign(r.dfci)}</span> điểm</b>"
+            f" · xu hướng {y0}–{y1}: {sign(r.trend)} điểm (Mann–Kendall p = {fmt_ha(r.mk_p, 3)})"
+            f" · <span class='badge {cls}'>{html.escape(r.verdict)}</span></div>")
+
+
+def _fci_intro(fci, years):
+    """How the FCI is computed, the weights and how many PAs fall in each verdict."""
+    y0, y1 = years[0], years[-1]
+    lab = CLASSES.set_index("value").label
+    weights = "".join(f"<tr><td>{html.escape(lab[v])}</td><td class='n'>{fmt_ha(w, 1)}</td></tr>"
+                      for v, w in sorted(WEIGHTS.items(), key=lambda kv: -kv[1]))
+    n = fci.verdict.value_counts()
+    same_sign = 100 * (np.sign(fci.dfci) == np.sign(fci.trend)).mean()
+    return f"""<h3 style='margin-top:18px'>Chỉ số tình trạng rừng (FCI)</h3>
+<p>Để tóm tắt biến động của mỗi khu bằng một con số, bài dùng chỉ số tình trạng rừng (Forest Condition Index, FCI). Mỗi
+lớp ForTy được gán một trọng số từ 0 đến 1 theo mức độ tự nhiên (bảng dưới). FCI của một năm là trung bình có trọng số
+theo diện tích trên toàn khu, quy về thang 0-100:</p>
+<p style='text-align:center'>FCI<sub>t</sub> = 100 × Σ<sub>c</sub> w<sub>c</sub>·A<sub>c,t</sub> / Σ<sub>c</sub>
+A<sub>c,t</sub> &nbsp;&nbsp;&nbsp; ΔFCI = FCI<sub>{y1}</sub> − FCI<sub>{y0}</sub></p>
+<p>trong đó A<sub>c,t</sub> là diện tích lớp c năm t và w<sub>c</sub> là trọng số của lớp. ΔFCI âm khi rừng bị mất hoặc
+bị suy thoái (rừng tự nhiên chuyển sang rừng trồng, cây công nghiệp hay đất khác), dương khi rừng tăng hoặc phục hồi. Vì
+chia cho diện tích khu, chỉ số so sánh được giữa khu lớn và khu nhỏ.</p>
+<div class='scroll'><table style='max-width:420px'><tr><th>Lớp</th><th class='n'>Trọng số w</th></tr>{weights}</table></div>
+<p>So sánh hai năm đầu và cuối chỉ có ý nghĩa nếu chúng phản ánh xu hướng của cả chuỗi. Vì vậy, với mỗi khu, bài tính
+thêm FCI cho cả {len(years)} năm, xu hướng theo độ dốc Theil–Sen và kiểm định Mann–Kendall. Kiểm tra trên {len(fci)} khu
+cho thấy ΔFCI giữa {y0} và {y1} cùng dấu với xu hướng {len(years)} năm ở {fmt_ha(same_sign, 0)}% số khu, nên hai năm đầu và cuối không phải năm bất thường. Một khu được
+kết luận <b>suy giảm</b> hoặc <b>phục hồi</b> khi đồng thời |ΔFCI| ≥ {fmt_ha(MIN_DELTA, 0)} điểm và Mann–Kendall
+p &lt; {fmt_ha(MAX_P, 2)}; các khu còn lại xếp vào nhóm <b>ổn định / không rõ</b>, vì thay đổi nhỏ hơn mức có thể
+phân biệt với sai số phân loại. Kết quả: {n.get(DECLINE, 0)} khu suy giảm, {n.get(RECOVERY, 0)} khu phục hồi,
+{len(fci) - n.get(DECLINE, 0) - n.get(RECOVERY, 0)} khu ổn định / không rõ.</p>
+<p class='note'>Trọng số là giả định của bài, nên giá trị tuyệt đối của FCI chỉ có nghĩa trong bộ trọng số này; chiều
+thay đổi và thứ hạng giữa các khu đáng tin hơn độ lớn. Chuỗi nhất quán chỉ cho thấy mô hình phân loại ổn định qua các
+năm, không chứng minh bản đồ đúng: lỗi phân loại có hệ thống sẽ lặp lại ở mọi năm.</p>
+"""
+
+
 def build_report(out_path, pas, areas, years, figures, observations, overlaps_df=None, failed=None, model=None,
-                 embed=True, transitions=None, title="Biến động loại rừng trong các khu bảo tồn Việt Nam"):
+                 embed=True, transitions=None, fci=None, title="Biến động loại rừng trong các khu bảo tồn Việt Nam"):
     """figures: {SITE_ID: {"map": png, "change": png, "chart": png}}; observations: {SITE_ID: (text, reason)};
-    transitions: long table from gee.compute_transitions (optional)."""
+    transitions: long table from gee.compute_transitions (optional); fci: table from index.fci_index (optional)."""
     out_path = Path(out_path)
     base = out_path.parent
     y0, y1 = years[0], years[-1]
@@ -155,7 +202,7 @@ biến động loại rừng trong 156 khu bảo tồn của Việt Nam giai đo
 rừng theo năm, bản đồ và các chuyển đổi lớp chính giữa 2017 và 2025, nhằm nhận diện nơi rừng tự nhiên được duy trì, nơi
 rừng chuyển sang rừng trồng, cây công nghiệp hoặc đất khác, và nơi rừng phục hồi. Kết quả mang tính sàng lọc, cần được đối
 chiếu với kiểm tra thực địa và số liệu theo dõi diễn biến rừng của địa phương.</p>
-</div>""")
+""" + ("" if fci is None else _fci_intro(fci, years)) + "</div>")
     p.append(f"""<div class='card'><h2 style='margin-top:0'>Dữ liệu và phương pháp</h2>
 <h3>Dữ liệu</h3>
 <p><b>Bộ dữ liệu ForTy.</b> Phân tích sử dụng chuỗi ForTy V2 Beta 2017-2025 trên Google Earth Engine
@@ -231,6 +278,7 @@ Cambridge, UK: UNEP-WCMC and IUCN. <a href='https://www.protectedplanet.net'>www
     # one section per PA
     p.append("<h2>Chi tiết từng khu</h2>")
     meta = FOREST.set_index("value")
+    fci_by_site = None if fci is None else fci.set_index("SITE_ID")
     for i, pa in enumerate(pas.itertuples(), 1):
         a = areas[areas.SITE_ID == pa.SITE_ID]
         if a.empty:
@@ -249,6 +297,8 @@ Cambridge, UK: UNEP-WCMC and IUCN. <a href='https://www.protectedplanet.net'>www
                  f" · IUCN {html.escape(str(pa.IUCN_CAT))} · công nhận {pa.STATUS_YR} · WDPA {pa.SITE_ID}"
                  f" · {fmt_ha(pa.GIS_AREA * 100)} ha"
                  + (f" · <span class='note'>diện tích tính ở {coarse} m</span>" if coarse > 10 else "") + "</p>")
+        if fci_by_site is not None and pa.SITE_ID in fci_by_site.index:
+            p.append(_fci_html(fci_by_site.loc[pa.SITE_ID], years))
         if text:
             p.append(f"<div class='ai'><span class='tag'>Nhận xét do AI viết ({html.escape(model or '')})</span>"
                      f"{html.escape(text)}</div>")
